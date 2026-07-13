@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IHMCL Auto Recruit Validator — Create account</title>
+  <link rel="icon" type="image/png" href="/static/img/ihmcl-logo.png">
+  <link href="/static/css/auth.css" rel="stylesheet">
+</head>
+<body>
+  <div class="auth-shell">
+    <div class="auth-brand-pane">
+      <div class="brand-header">
+        <img src="/static/img/ihmcl-logo.png" alt="IHMCL logo">
+        <div>
+          <div class="name">IHMCL</div>
+          <div class="sub">Indian Highways Management Company Limited</div>
+        </div>
+      </div>
+      <h1>Auto Recruit Validator</h1>
+      <p>Create your recruitment-team account to start screening candidates for
+         IHMCL job openings with AI-assisted criteria extraction and document verification.</p>
+      <div class="brand-badge">🔒 Session stays signed in for 30 days on this device</div>
+    </div>
+
+    <div class="auth-form-pane">
+      <div class="auth-card">
+        <div class="mobile-brand">
+          <img src="/static/img/ihmcl-logo.png" alt="IHMCL logo">
+          <span>IHMCL</span>
+        </div>
+        <h2>Create account</h2>
+        <div class="lead">Set up access for the HR screening dashboard.</div>
+
+        <form id="signupForm">
+          <div class="row-2">
+            <div>
+              <label for="firstName">First name</label>
+              <input type="text" id="firstName" placeholder="Priya" required>
+            </div>
+            <div>
+              <label for="lastName">Last name</label>
+              <input type="text" id="lastName" placeholder="Sharma" required>
+            </div>
+          </div>
+
+          <label for="email">Work email</label>
+          <input type="email" id="email" placeholder="you@ihmcl.co.in" required>
+
+          <label for="role">Role</label>
+          <select id="role" style="width:100%; padding:11px 12px; border:1px solid var(--gray-200); border-radius:9px; font-size:14px;">
+            <option value="RECRUITER">Recruiter</option>
+            <option value="HIRING_MANAGER">Hiring Manager</option>
+          </select>
+
+          <label for="password">Password</label>
+          <input type="password" id="password" placeholder="At least 8 characters" required minlength="8">
+
+          <label for="confirmPassword">Confirm password</label>
+          <input type="password" id="confirmPassword" placeholder="Re-enter password" required minlength="8">
+
+          <div id="formError" class="form-error"></div>
+
+          <button type="submit" class="submit-btn" id="submitBtn">Create account</button>
+        </form>
+
+        <div class="switch-link">
+          Already have an account? <a href="/login">Sign in</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('signupForm');
+    const errorBox = document.getElementById('formError');
+    const btn = document.getElementById('submitBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBox.classList.remove('visible');
+
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+      if (password !== confirmPassword) {
+        errorBox.textContent = 'Passwords do not match.';
+        errorBox.classList.add('visible');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Creating account…';
+
+      try {
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password,
+            firstName: document.getElementById('firstName').value,
+            lastName: document.getElementById('lastName').value,
+            role: document.getElementById('role').value,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error?.message || 'Could not create account.');
+        }
+        window.location.href = '{{ frontend_origin }}/';
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.classList.add('visible');
+        btn.disabled = false;
+        btn.textContent = 'Create account';
+      }
+    });
+  </script>
+</body>
+</html>

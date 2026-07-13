@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IHMCL Auto Recruit Validator — Login</title>
+  <link rel="icon" type="image/png" href="/static/img/ihmcl-logo.png">
+  <link href="/static/css/auth.css" rel="stylesheet">
+</head>
+<body>
+  <div class="auth-shell">
+    <div class="auth-brand-pane">
+      <div class="brand-header">
+        <img src="/static/img/ihmcl-logo.png" alt="IHMCL logo">
+        <div>
+          <div class="name">IHMCL</div>
+          <div class="sub">Indian Highways Management Company Limited</div>
+        </div>
+      </div>
+      <h1>Auto Recruit Validator</h1>
+      <p>AI-assisted screening for IHMCL recruitment drives — extract job criteria from
+         advertisements, bulk-screen candidates against the checklist, and route only
+         verified profiles to interview.</p>
+      <div class="brand-badge">🔒 Session stays signed in for 30 days on this device</div>
+    </div>
+
+    <div class="auth-form-pane">
+      <div class="auth-card">
+        <div class="mobile-brand">
+          <img src="/static/img/ihmcl-logo.png" alt="IHMCL logo">
+          <span>IHMCL</span>
+        </div>
+        <h2>Sign in</h2>
+        <div class="lead">Use your recruitment-team account to continue.</div>
+
+        <form id="loginForm">
+          <label for="email">Work email</label>
+          <input type="email" id="email" name="email" placeholder="you@ihmcl.co.in" required autofocus>
+
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="••••••••" required>
+
+          <div class="remember-row">
+            <input type="checkbox" id="remember" checked>
+            <label for="remember" style="margin:0; font-weight:400;">Keep me signed in for 30 days</label>
+          </div>
+
+          <div id="formError" class="form-error"></div>
+
+          <button type="submit" class="submit-btn" id="submitBtn">Sign in</button>
+        </form>
+
+        <div class="switch-link">
+          New to IHMCL Auto Recruit Validator? <a href="/signup">Create an account</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const errorBox = document.getElementById('formError');
+    const btn = document.getElementById('submitBtn');
+    const params = new URLSearchParams(window.location.search);
+    const nextUrl = params.get('next') || '{{ frontend_origin }}/';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBox.classList.remove('visible');
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error?.message || 'Login failed. Please check your credentials.');
+        }
+        window.location.href = nextUrl;
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.classList.add('visible');
+        btn.disabled = false;
+        btn.textContent = 'Sign in';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+recruit.db
+storage/resumes/*
+storage/jd/*
+storage/zips/*
+!storage/resumes/.gitkeep
+!storage/jd/.gitkeep
+!storage/zips/.gitkeep
+.venv/
+venv/
