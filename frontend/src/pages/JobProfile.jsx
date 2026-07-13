@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useFlowState } from '../context/FlowStateContext';
 import {
   Upload,
   FileText,
@@ -13,6 +15,7 @@ import {
   Sparkles,
   Loader,
   CheckCircle,
+  ArrowRight,
 } from 'lucide-react';
 import { getJobProfiles, createJobProfile, updateCriteriaSet, extractCriteriaFromJD } from '../services/api';
 import { educationOptions, conditionOptions } from '../data/mockData';
@@ -210,40 +213,60 @@ function CustomRuleBuilder({ rules, onChange }) {
 
 export default function JobProfile() {
   const [profiles, setProfiles] = useState([]);
-  const [selectedId, setSelectedId] = useState('');
+  const [selectedId, setSelectedId] = useState(() => localStorage.getItem('ihmcl_selected_job_id') || '');
   const [loading, setLoading] = useState(true);
-  const [jdFile, setJdFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [saved, setSaved] = useState(false);
   const [extracting, setExtracting] = useState(false);
-  const [extractedPreview, setExtractedPreview] = useState(null); // holds { criteria, confidence, warnings }
-  const [extractError, setExtractError] = useState(null);
+  const navigate = useNavigate();
 
-  // Criteria form state
-  const [title, setTitle] = useState('');
-  const [department, setDepartment] = useState('');
-  const [minExp, setMinExp] = useState('');
-  const [maxExp, setMaxExp] = useState('');
-  const [skills, setSkills] = useState([]);
-  const [eduDegree, setEduDegree] = useState('');
-  const [eduField, setEduField] = useState('');
-  const [eduMandatory, setEduMandatory] = useState(true);
-  const [location, setLocation] = useState('');
-  const [customRules, setCustomRules] = useState([]);
+  // These fields live in FlowStateContext (not local useState) so the in-progress
+  // JD upload, extraction preview, and criteria form survive navigating to Step 2
+  // (Shortlist Candidates) and back.
+  const { jobDraft, updateJobDraft, resetJobDraft } = useFlowState();
+  const {
+    jdFile, extractedPreview, extractError,
+    title, department, minExp, maxExp, skills,
+    eduDegree, eduField, eduMandatory, location, customRules,
+  } = jobDraft;
+  const setJdFile = (v) => updateJobDraft({ jdFile: v });
+  const setExtractedPreview = (v) => updateJobDraft({ extractedPreview: v });
+  const setExtractError = (v) => updateJobDraft({ extractError: v });
+  const setTitle = (v) => updateJobDraft({ title: v });
+  const setDepartment = (v) => updateJobDraft({ department: v });
+  const setMinExp = (v) => updateJobDraft({ minExp: v });
+  const setMaxExp = (v) => updateJobDraft({ maxExp: v });
+  const setSkills = (v) => updateJobDraft({ skills: v });
+  const setEduDegree = (v) => updateJobDraft({ eduDegree: v });
+  const setEduField = (v) => updateJobDraft({ eduField: v });
+  const setEduMandatory = (v) => updateJobDraft({ eduMandatory: v });
+  const setLocation = (v) => updateJobDraft({ location: v });
+  const setCustomRules = (v) => updateJobDraft({ customRules: v });
 
   useEffect(() => {
     async function load() {
       const data = await getJobProfiles();
       setProfiles(data);
       setLoading(false);
+      // If the previously-selected job (from this page or Bulk Screening) no longer exists, clear it
+      if (selectedId && selectedId !== 'new' && !data.find((p) => p.id === selectedId)) {
+        setSelectedId('');
+        localStorage.removeItem('ihmcl_selected_job_id');
+      }
     }
     load();
   }, []);
 
+  // Keep the selected job in sync across pages (Bulk Screening reads the same key)
+  useEffect(() => {
+    if (selectedId && selectedId !== 'new') {
+      localStorage.setItem('ihmcl_selected_job_id', selectedId);
+    }
+  }, [selectedId]);
+
   // Load profile data when selection changes
   useEffect(() => {
     if (selectedId && selectedId !== 'new') {
-      localStorage.setItem('selectedJobProfileId', selectedId);
       const profile = profiles.find((p) => p.id === selectedId);
       if (profile) {
         setTitle(profile.title);
@@ -276,25 +299,12 @@ export default function JobProfile() {
         }
       }
     } else if (selectedId === 'new') {
-      localStorage.removeItem('selectedJobProfileId');
       resetForm();
     }
   }, [selectedId, profiles]);
 
   function resetForm() {
-    setTitle('');
-    setDepartment('');
-    setMinExp('');
-    setMaxExp('');
-    setSkills([]);
-    setEduDegree('');
-    setEduField('');
-    setEduMandatory(true);
-    setLocation('');
-    setCustomRules([]);
-    setJdFile(null);
-    setExtractedPreview(null);
-    setExtractError(null);
+    resetJobDraft();
   }
 
   function handleNewProfile() {
@@ -359,10 +369,7 @@ export default function JobProfile() {
       setProfiles(data);
       if (selectedId === 'new') {
         const latest = data[0]; // Already ordered desc by createdAt in backend
-        if (latest) {
-          setSelectedId(latest.id);
-          localStorage.setItem('selectedJobProfileId', latest.id);
-        }
+        if (latest) setSelectedId(latest.id);
       }
 
       setSaved(true);
@@ -507,10 +514,7 @@ export default function JobProfile() {
                       <div style={{ marginTop: 'var(--space-sm)', padding: 'var(--space-md)', background: 'var(--color-success-bg, #f0fdf4)', border: '1px solid var(--color-success-border, #bbf7d0)', borderRadius: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, fontSize: 'var(--font-sm)', color: 'var(--color-success, #16a34a)', marginBottom: 'var(--space-sm)' }}>
                           <CheckCircle size={14} />
-                          AI extracted {extractedPreview.rawRules?.length || 0} rules
-                          <span style={{ marginLeft: 'auto', fontSize: 'var(--font-xs)', fontWeight: 400, color: 'var(--text-muted)' }}>
-                            Confidence: {Math.round((extractedPreview.confidence || 0) * 100)}%
-                          </span>
+                          AI extracted criteria from JD
                         </div>
                         {extractedPreview.criteria?.skills?.length > 0 && (
                           <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-secondary)', marginBottom: '4px' }}>
@@ -708,6 +712,16 @@ export default function JobProfile() {
                   <Save size={16} />
                   {saved ? 'Saved!' : 'Save Criteria'}
                 </button>
+                {selectedId && selectedId !== 'new' && (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => navigate('/screening')}
+                    style={{ minWidth: '160px' }}
+                  >
+                    Move to Step 2
+                    <ArrowRight size={16} />
+                  </button>
+                )}
               </div>
             </div>
           </div>

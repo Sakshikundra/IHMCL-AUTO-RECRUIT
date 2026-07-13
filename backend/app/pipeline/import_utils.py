@@ -3,18 +3,49 @@ import re
 import zipfile
 
 import openpyxl
+import pandas as pd
+
+
+def _rows_from_xlsx(path: str) -> list[tuple]:
+    wb = openpyxl.load_workbook(path, data_only=True)
+    ws = wb.active
+    return list(ws.iter_rows(values_only=True))
+
+
+def _rows_from_legacy_xls_or_csv(path: str) -> list[tuple]:
+    """
+    Handles legacy .xls (via the xlrd engine) and .csv files, which openpyxl
+    cannot read. Returns the same [(row1_cells...), (row2_cells...)] shape
+    that _rows_from_xlsx produces, header row included.
+    """
+    ext = os.path.splitext(path)[1].lower()
+    if ext == ".csv":
+        df = pd.read_csv(path, header=None, dtype=object)
+    else:
+        df = pd.read_excel(path, header=None, dtype=object, engine="xlrd")
+    df = df.where(pd.notnull(df), None)
+    return [tuple(row) for row in df.values.tolist()]
 
 
 def parse_candidate_excel(path: str) -> list[dict]:
     """
     Reads a recruiter-provided candidate sheet. Expected (case-insensitive, flexible)
     header names: Reference/Reference Number, Name/Candidate Name, Email.
-    Any other columns are ignored gracefully.
+    Any other columns are ignored gracefully. Supports modern .xlsx/.xlsm (openpyxl),
+    legacy .xls (xlrd), and .csv files.
     """
-    wb = openpyxl.load_workbook(path, data_only=True)
-    ws = wb.active
+    ext = os.path.splitext(path)[1].lower()
+    if ext in (".xlsx", ".xlsm"):
+        rows = _rows_from_xlsx(path)
+    elif ext in (".xls", ".csv"):
+        rows = _rows_from_legacy_xls_or_csv(path)
+    else:
+        # Unknown extension - try modern format first, fall back to legacy
+        try:
+            rows = _rows_from_xlsx(path)
+        except Exception:
+            rows = _rows_from_legacy_xls_or_csv(path)
 
-    rows = list(ws.iter_rows(values_only=True))
     if not rows:
         return []
 

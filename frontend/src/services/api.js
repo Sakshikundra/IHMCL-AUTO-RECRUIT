@@ -13,25 +13,6 @@ const CREDENTIALS = {
   HIRING_MANAGER: { email: 'manager@recruitment.local', password: 'Manager@123456' },
 };
 
-async function getApiBaseUrl() {
-  const candidates = [
-    import.meta.env.VITE_API_BASE_URL,
-    'http://localhost:3001',
-    'http://localhost:3002',
-  ].filter(Boolean);
-
-  for (const baseUrl of candidates) {
-    try {
-      const res = await fetch(`${baseUrl}/api/health`);
-      if (res.ok) return baseUrl;
-    } catch {
-      // try next candidate
-    }
-  }
-
-  return candidates[0] || 'http://localhost:3001';
-}
-
 /**
  * Ensures the client has logged in and has a valid token.
  * Automatically authenticates using the active role credentials.
@@ -43,16 +24,12 @@ async function ensureAuthenticated() {
   const credentials = CREDENTIALS[currentRole];
   authPromise = (async () => {
     try {
-      const baseUrl = await getApiBaseUrl();
-      const res = await fetch(`${baseUrl}/api/auth/login`, {
+      const res = await fetch('http://localhost:3001/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials),
       });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error?.message || 'Auto-login failed');
-      }
+      if (!res.ok) throw new Error('Auto-login failed');
       const data = await res.json();
       token = data.accessToken;
       currentUser = data.user;
@@ -60,7 +37,6 @@ async function ensureAuthenticated() {
     } catch (err) {
       console.error('API service auto-login error:', err);
       token = null;
-      currentUser = null;
       throw err;
     } finally {
       authPromise = null;
@@ -84,8 +60,7 @@ async function request(endpoint, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
 
-  const baseUrl = await getApiBaseUrl();
-  const res = await fetch(`${baseUrl}${endpoint}`, {
+  const res = await fetch(`http://localhost:3001${endpoint}`, {
     ...options,
     headers,
   });
@@ -391,8 +366,7 @@ export async function extractCriteriaFromJD(file, jobId = 'draft') {
   formData.append('file', file);
   formData.append('jobId', jobId);
 
-  const baseUrl = await getApiBaseUrl();
-  const res = await fetch(`${baseUrl}/api/jobs/extract-jd`, {
+  const res = await fetch('http://localhost:3001/api/jobs/extract-jd', {
     method: 'POST',
     headers: { Authorization: `Bearer ${t}` },
     body: formData,
@@ -438,8 +412,8 @@ export async function getCandidates(jobProfileId, statusFilter) {
     const formData = {
       name: app.candidateName || app.referenceNumber,
       dob: app.parsedFormData?.dob || 'N/A',
-      education: app.parsedFormData?.education || 'N/A',
-      experience: app.parsedFormData?.experience ? `${app.parsedFormData.experience} years` : 'N/A',
+      education: app.parsedFormData?.education || app.parsedFormData?.highest_degree || 'N/A',
+      experience: app.parsedFormData?.experience_years ? `${app.parsedFormData.experience_years} years` : 'N/A',
       idNumber: app.parsedFormData?.idNumber || 'N/A'
     };
 

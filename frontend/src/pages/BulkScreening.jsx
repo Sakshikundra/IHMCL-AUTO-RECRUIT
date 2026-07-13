@@ -11,8 +11,10 @@ import {
   AlertTriangle,
   Users,
   Eye,
+  Target,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useFlowState } from '../context/FlowStateContext';
 import { getJobProfiles, getCandidates, processBulkUpload } from '../services/api';
 
 function CriteriaBreakdown({ result }) {
@@ -121,34 +123,30 @@ function UploadDropzone({
 
 export default function BulkScreening() {
   const [profiles, setProfiles] = useState([]);
-  const [selectedProfileId, setSelectedProfileId] = useState('');
-  const [zipFile, setZipFile] = useState(null);
-  const [excelFile, setExcelFile] = useState(null);
+  const [selectedProfileId, setSelectedProfileId] = useState(() => localStorage.getItem('ihmcl_selected_job_id') || '');
   const [dragOver, setDragOver] = useState(null);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
-  const [processed, setProcessed] = useState(false);
-  const [candidates, setCandidates] = useState([]);
-  const [filter, setFilter] = useState('All');
   const [expandedRow, setExpandedRow] = useState(null);
+
+  // zipFile / excelFile / processed / candidates / filter live in FlowStateContext so
+  // this in-progress upload + its results survive navigating back to Step 1 and returning.
+  const { screeningDraft, updateScreeningDraft } = useFlowState();
+  const { zipFile, excelFile, processed, candidates, filter } = screeningDraft;
+  const setZipFile = (v) => updateScreeningDraft({ zipFile: v });
+  const setExcelFile = (v) => updateScreeningDraft({ excelFile: v });
+  const setProcessed = (v) => updateScreeningDraft({ processed: v });
+  const setCandidates = (v) => updateScreeningDraft({ candidates: v });
+  const setFilter = (v) => updateScreeningDraft({ filter: v });
 
   useEffect(() => {
     async function load() {
-      try {
-        const data = await getJobProfiles();
-        const activeProfiles = (data || []).filter((p) => (p.status || '').toLowerCase() === 'active');
-        setProfiles(activeProfiles);
-
-        const storedProfileId = localStorage.getItem('selectedJobProfileId');
-        const preferredProfile = storedProfileId && activeProfiles.some((p) => p.id === storedProfileId)
-          ? storedProfileId
-          : activeProfiles[0]?.id || '';
-
-        if (preferredProfile) {
-          setSelectedProfileId(preferredProfile);
-        }
-      } catch (err) {
-        console.error('Failed to load job profiles:', err);
+      const data = await getJobProfiles();
+      const active = data.filter((p) => p.status === 'active');
+      setProfiles(active);
+      // Auto-select the job that was last selected/created on the Job Profile page
+      if (!active.find((p) => p.id === selectedProfileId)) {
+        setSelectedProfileId(active[0]?.id || '');
       }
     }
     load();
@@ -181,6 +179,8 @@ export default function BulkScreening() {
   const eligibleCount = candidates.filter((c) => c.screeningStatus === 'Eligible').length;
   const reviewCount = candidates.filter((c) => c.screeningStatus === 'Needs Manual Review').length;
   const filteredCandidates = filter === 'All' ? candidates : candidates.filter((c) => c.screeningStatus === filter);
+  const selectedProfile = profiles.find((p) => p.id === selectedProfileId);
+  const mandatorySkills = (selectedProfile?.criteriaSet?.requiredSkills || []).filter((s) => s.mandatory);
 
   return (
     <div className="animate-slide-up">
@@ -195,9 +195,8 @@ export default function BulkScreening() {
             className="form-select"
             value={selectedProfileId}
             onChange={(e) => {
-              const nextValue = e.target.value;
-              setSelectedProfileId(nextValue);
-              localStorage.setItem('selectedJobProfileId', nextValue);
+              setSelectedProfileId(e.target.value);
+              localStorage.setItem('ihmcl_selected_job_id', e.target.value);
               setProcessed(false);
               setCandidates([]);
               setZipFile(null);
@@ -214,6 +213,47 @@ export default function BulkScreening() {
           </select>
         </div>
       </div>
+
+      {selectedProfile && (
+        <div
+          className="card"
+          style={{
+            marginBottom: 'var(--space-lg)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 'var(--space-md)',
+            padding: 'var(--space-md) var(--space-lg)',
+            background: 'var(--surface-subtle, #f8fafc)',
+          }}
+        >
+          <Target size={20} style={{ marginTop: '2px', flexShrink: 0, color: 'var(--accent-primary, #2952cc)' }} />
+          <div>
+            <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+              Screening candidates against
+            </div>
+            <div style={{ fontWeight: 600, fontSize: 'var(--font-md)', marginTop: '2px' }}>
+              {selectedProfile.title}
+              {selectedProfile.department ? ` — ${selectedProfile.department}` : ''}
+            </div>
+            {selectedProfile.criteriaSet && (
+              <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-muted)', marginTop: '4px' }}>
+                {selectedProfile.criteriaSet.minExperienceYears > 0 && (
+                  <span>
+                    {selectedProfile.criteriaSet.minExperienceYears}
+                    {selectedProfile.criteriaSet.maxExperienceYears > 0 ? `–${selectedProfile.criteriaSet.maxExperienceYears}` : '+'} yrs exp
+                  </span>
+                )}
+                {mandatorySkills.length > 0 && (
+                  <span>
+                    {selectedProfile.criteriaSet.minExperienceYears > 0 ? '  •  ' : ''}
+                    Mandatory: {mandatorySkills.map((s) => s.name).join(', ')}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {!selectedProfileId ? (
         <div className="empty-state">

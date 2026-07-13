@@ -61,7 +61,7 @@ function FieldCompareRow({ label, formValue, docValue }) {
 
 export default function Verification() {
   const [profiles, setProfiles] = useState([]);
-  const [selectedProfileId, setSelectedProfileId] = useState('');
+  const [selectedProfileId, setSelectedProfileId] = useState(() => localStorage.getItem('ihmcl_selected_job_id') || '');
   const [candidates, setCandidates] = useState([]);
   const [selectedCandidate, setSelectedCandidate] = useState(null);
   const [actionTaken, setActionTaken] = useState(null);
@@ -69,10 +69,11 @@ export default function Verification() {
   useEffect(() => {
     async function load() {
       const data = await getJobProfiles();
-      setProfiles(data.filter((p) => p.status === 'active'));
-      if (data.length > 0) {
-        const firstActive = data.find((p) => p.status === 'active');
-        if (firstActive) setSelectedProfileId(firstActive.id);
+      const active = data.filter((p) => p.status === 'active');
+      setProfiles(active);
+      // Keep whichever job was selected on Step 1/2, if it's still active; otherwise fall back to the first active job
+      if (!active.find((p) => p.id === selectedProfileId)) {
+        setSelectedProfileId(active[0]?.id || '');
       }
     }
     load();
@@ -155,7 +156,10 @@ export default function Verification() {
           <select
             className="form-select"
             value={selectedProfileId}
-            onChange={(e) => setSelectedProfileId(e.target.value)}
+            onChange={(e) => {
+              setSelectedProfileId(e.target.value);
+              localStorage.setItem('ihmcl_selected_job_id', e.target.value);
+            }}
             style={{ width: '280px' }}
           >
             <option value="">Select Job Profile...</option>
