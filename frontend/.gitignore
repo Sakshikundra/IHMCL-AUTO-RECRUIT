@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.sqlite3
+*.log
+.env
+env/
+venv/
+.venv/
+
+# Node dependencies and build output
+node_modules/
+dist/
+.vite/
+
+# Editor and OS files
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Ignore nested git metadata in frontend
+frontend/.git/
+frontend/IHMCL-WEBSITE/.git/
